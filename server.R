@@ -1,64 +1,31 @@
-shinyServer(function(input, output, clientData, session){
-  
-  
-  data_url <- download_data()
-  
-  updateSliderInput(session, "fmag", min = min(data_url$magnitude), max = max(data_url$magnitude))
-  
-  updateSliderInput(session, "fdepth", min = min(data_url$depth), max = max(data_url$depth))
-  
-  data <- reactive({
+server <- function(input, output, session) {
+   output$my_map <- renderLeaflet({
     
-    data <- data_url %>% 
-      filter(between(magnitude, input$fmag[1], input$fmag[2])) %>% 
-      filter(between(depth, input$fdepth[1], input$fdepth[2]))
+    if(input$cov4=="Population"){
     
-    data
+     pal <- colorFactor(
+      palette = "Reds",
+      domain = shape1$Population)
     
-  })
   
-  output$map <- renderLeaflet({
+    #legend.title <- paste(paste0(input$cov4, " ("), round(min(x, na.rm=T), 2), " - ", round(max(x, na.rm=T), 2), ")", sep="")
     
-    data <- data()
-    
-    m <- data %>%
-      leaflet() %>%
-      addTiles("http://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png")
-    
-    if (nrow(data) > 0) {
-      m <- m %>%
-        addCircles(lng = ~longitude, lat = ~latitude, radius = ~size,
-                   fillOpacity = 0.3, opacity = 0.35, weight = 0,
-                   color = "#F0F0F0", fillColor = "#FFF",
-                   popup = ~popup_info)
+    leaflet(shape1) %>%
+      addTiles(group = "OSM (default)") %>%
+      addProviderTiles("Stamen.Toner", group = "Toner") %>%
+      addProviderTiles("Stamen.TonerLite", group = "Toner Lite") %>%
+      addProviderTiles("CartoDB.Positron", group = "CartoDB") %>%
+     
+      addPolygons(stroke = FALSE, smoothFactor = 0.2, fillOpacity = 0.8, color = ~pal(x)) %>%
       
+      addLegend("bottomright", pal = pal, values = ~Population,  labFormat = labelFormat(suffix = ""), opacity = 0.3) %>%
+     
+      addLayersControl(baseGroups = c("OSM (default)", "Toner", "Toner Lite", "CartoDB"),options = layersControlOptions(collapsed = FALSE))
+    
     }
-    
-    if (input$showplates) {
-      
-      for(g in unique(data_plates$group)){
-        
-        m <- m %>% addPolygons(lng = ~long, lat = ~lat,
-                               fill = FALSE, color = "#FFF", weight = 2, opacity = 0.2,
-                               data = data_plates %>% filter(group == g))
-      }
-    }
-    
-    m
-    
-  })
   
-  output$table <- DT::renderDataTable({
+    })
     
-    data <- data()
-    
-    d <- data %>% select(-popup_info, -size)
-    
-    opts <- list(pageLength = 5, lengthChange = FALSE, searching = FALSE,
-                 info = FALSE,  pagingType = "full")
-    
-    DT::datatable(d, escape = FALSE, rownames = FALSE, options = opts)
-    
-  })
-  
-})
+ 
+}
+shinyApp(ui = ui, server = server)
